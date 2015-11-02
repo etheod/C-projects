@@ -1,0 +1,1011 @@
+/*
+ *   ===Thema 1===
+ *     Created on: May 10, 2012
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAXSTRSIZE 12
+int counter;
+int letter;
+
+//domh gia xrwma
+typedef struct Color{
+	char *current;
+}color;
+
+const char *wh="WHITE";
+const char *bl="BLACK";
+const char *gr="GREY";
+
+//kathe instance ths ouras pou tha xrhsimopoihthei sto bfs
+typedef struct Queuelist{
+	struct vertex *G;
+	struct Queuelist *next;
+}queuelist;
+
+//oura pou tha xrhsimopoihthei sto bfs
+typedef struct Queue{
+	struct Queuelist *head;
+	struct Queuelist *tail;
+}queue;
+
+//gia na apothikeysw ola ta critical pou tyxon na yparxoun
+typedef struct iscritical{
+	struct vertex* G;
+}critList;
+critList **CL;
+
+typedef enum {
+	FALSE,
+	TRUE
+}bool;
+
+//domh grafou
+typedef struct vertex {
+	char *label;						// onoma komvou
+	color clr;							// xrwma episkepshs komvoy
+	struct vertex* pred;				// progonos tou komvou ston grafo
+	bool critical; 						// ean o komvos einai krisimos einai iso me 1 alliws me 0
+	int pos; 							// aykswn arithmos tou komvou sto grafo
+}Vertex;
+Vertex **G;
+
+//krataw ta stoixeia apo kathe grammh tou arxeiou se struct gia na mporw na ta epeksergastw
+typedef struct FileRead{
+	char *Nname;						//onoma komvou
+	int  indexnum;						//AA
+	int  **edge;						//akmes me arxiko to node
+	int  **mirror;						//mirror akmes
+}fileread;
+fileread **Node;
+
+//o pinakas geitniashs
+typedef struct ad_matrix{
+	struct matrixtable **table;
+	int size;
+}Matrix;
+Matrix *matrix;
+
+//ti tha exei to kathe table[i][j]
+typedef struct matrixtable{
+	char **Nodesinblock;
+	int **edgesInblock;
+	int value;
+}MatTable;
+
+//archetypa synarthsewn
+void info();										//arxika info
+void allocateG(int);								//desmeysh mnhmhs gia grafo
+void allocateNode(int);					 	   		//desmeysh mnhmhs gia fileread
+void createMatrix(int);								//dhmiourgia pinaka geitniashs
+int getnumberfromline(char array[],int);			//pairnw ta noumera apo to arxeio
+char *getNodeNamefromline(char array[],char *,int);	//pairnw tis onomasies twn komvwn
+int readfromFile(FILE *);							//diavazw apo to arxeio
+void initGraph(int,fileread **);					//initialize grafou
+void allocatematrix(int);							//desmeysh gia ton pinaka
+void freemem(int);									//free memory
+int getnumbers(int,int );							//pairnw ta epithymhta noymera poy epilegei o xrhsths gia elegxo reliably connected
+void Bfs(int ,int,struct Queue *);
+bool Reliably_Connected(struct vertex*, struct vertex*, struct vertex*,int,int,int,int);
+void getifcritical(struct vertex*, struct vertex*, struct vertex*,int,int,int);
+void pushqueue(struct Queue *,struct vertex *);		//eisagwgh stoixeiou sthn oura
+struct vertex *popqueue(struct Queue *);			//exagwgh stoixeiou apo thn oura
+void init_queue(struct Queue *);					//initialize oura
+
+/*
+==========================================================================================================================
+												MAIN PROGRAM
+==========================================================================================================================
+*/
+int main()
+{
+	//	setvbuf(stdout, NULL, _IONBF, 0); 		//epsaksa giati den mou paize se windows sto eclipse kai vrhka ayta ta 2 ws lysh
+	//	setvbuf(stderr, NULL, _IONBF, 0);		//an xrhsimopoihthoun se ayto to shmeio paizei
+	FILE *pfile;
+	char inputfname[250]="\0";
+	int fileLen;
+	int r,s2,i;
+	int s1=0;
+	char c,ctemp;
+
+	info();
+	counter=0;
+	printf("Give the name of the file (max 250 characters, including path):\n");
+	while (fgets(inputfname,250,stdin)){
+		fileLen=strlen(inputfname);
+		if(fileLen<=250){
+			if( inputfname[fileLen-1]=='\n') //epeidh to fgets krataei to newline sto telos to kanw 0 gia na anagnwrisei to arxeio
+				inputfname[fileLen-1]='\0';
+			pfile = fopen(inputfname,"r"); // read mode
+			if(pfile==NULL){
+				printf("***********************************************************************\n");
+				printf("Can't open given file %s to read.\n",inputfname);
+				printf("Problem during initialization.\n");
+				printf("***********************************************************************\n");
+				continue;
+			}
+			else{
+				printf("***********************************************************************\n");
+				printf("=========  File %s opened successfully.Reading Mode  ==========\n",inputfname);
+				printf("============  Contents of given file %s are: ==================\n",inputfname);
+				printf("***********************************************************************\n");
+				r=readfromFile(pfile);
+				initGraph(r,Node);
+				createMatrix(r);
+				do{
+					printf("Give the starting node: < a number between 1 and %d >\n",r);
+					s1=getnumbers(r,s1);
+					printf("Give the terminal node: < a number between 1 and %d >\n",r);
+					s2=getnumbers(r,s1);
+					for (i=0;i<r;i++)
+						if ((G[i]->pos)==(s1-1)){
+							printf("Starting vertex is: %s\n",G[i]->label);
+							break;
+						}
+					for (i=0;i<r;i++)
+						if ((G[i]->pos)==(s2-1)){
+							printf("Terminal vertex is: %s\n",G[i]->label);
+							printf("*******************************\n\n");
+							break;
+						}
+					struct vertex *u=NULL;
+					struct vertex *v=NULL;
+					struct vertex *exclude=NULL;
+					getifcritical(u,v,exclude,r,s1,s2);
+					printf("\nPress 'x' to exit or any other key to continue...\n");
+					do {
+						scanf("%c", &c);
+						if (c=='x')
+							break;
+						ctemp=getchar();
+					}while (ctemp!='\n');
+					s1=0;				//gia na mhn krataei tous arithmous
+					s2=0;				//se periptwsh epanalhpshs elegxou me diaforetika vertex
+				}while (c!='x');
+				printf("Exiting...\n");
+			}
+			fclose(pfile);
+			freemem(r);
+			break;
+		}
+		else{
+			printf("***********************************************************************\n");
+			printf("Too lange file name.\nTry again.");
+			printf("***********************************************************************\n");
+		}
+	}
+	return 0;
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	reliably connected
+==========================================================================================================================
+*/
+
+bool Reliably_Connected(struct vertex* u, struct vertex* v, struct vertex* exclude,int numberofnodes,int number1,int number2,int count)
+{
+	struct Queue *Q;
+	Q=(struct Queue*)malloc(sizeof(struct Queue));
+	if(Q==NULL){
+		printf("No memory available.\n");
+		exit(1);
+	}
+	init_queue(Q);
+	counter=0;								//epanafora metrhth kathe fora pou mpainei kai tha einai to prwto node
+	Bfs(number1,numberofnodes,Q);			//kanw bfs
+	if(G[number2-1]->clr.current[0]=='W'){	//ean to G[deyteros dosmenos arithmos-1(afou ksekinw apo to 0 ta nodes)] exei leyko xrwma
+		G[count]->critical=FALSE;			//ton kanw false kai epistrefw false sthn getifcritical
+		return FALSE;
+	}
+	return TRUE;
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 Gia na kanw elegxo gia ola ta nodes ena ena
+==========================================================================================================================
+*/
+
+void getifcritical(struct vertex* u, struct vertex* v, struct vertex* exclude,int numberofnodes,int num1,int num2)
+{
+	int i,x,y;
+	int j=0;
+	int again;
+	int count=0;
+	int iscount;
+	int iscritical=0;
+	int iscounted[numberofnodes];								  //na vazw ta y pou exoun timh ena
+	CL=(critList**)malloc((numberofnodes-2)*sizeof(critList*));   //desmeyw gia neo array krisimwn komvwn
+	if(CL==NULL){
+		printf("out of memory\n");
+		exit(1);
+	}
+	//gia ola ektos apo tous 2 pou eisagei o xrhsths
+	for (i=0;i<numberofnodes;i++){
+		if ((i==G[(num1-1)]->pos || i==G[num2-1]->pos)){
+			i++;
+			if ((i==G[num2-1]->pos)||(i==G[(num1-1)]->pos)) //giati otan blepei to prwto i++ de stamataei sto deytero opote to kanw deytero
+				i++;
+			if (i==numberofnodes)//gia na mhn kanei i++ otan einai to teleytaio
+				break;
+		}
+		count=0;
+		for(iscount=0;iscount<numberofnodes;iscount++)
+			iscounted[iscount]=0;
+		iscount=0;
+		exclude=(struct vertex*)malloc(sizeof(struct vertex));//neos vertex exclude pou tha isoutai me ton G[i]
+		exclude=G[i];
+		x=G[i]->pos;
+		for(y=0;y<numberofnodes;y++)
+			//thelw na ftasei sto teleytaio gramma tou nodename gia na to elegksei afou einai sigouros o elegxos sthn petiptwsh A-Z
+			if ((matrix->table[x][y].Nodesinblock[0][6]==G[i]->label[6] || matrix->table[x][y].Nodesinblock[1][6]==G[i]->label[6]) && (matrix->table[x][y].value==1)){
+				//opou vrisketai ayto to node mhdenizw thn timh ston pinaka
+				matrix->table[x][y].value=0;
+				matrix->table[y][x].value=0;
+				iscounted[iscount]=y;
+				count++;
+				iscount++;
+			}
+
+		if (Reliably_Connected(u,v,exclude,numberofnodes,num1,num2,i)==FALSE){		//ean vgalei to reliably false tote
+			CL[j]=(critList*)malloc(sizeof(critList));								//desmeyw gia neo krisimo
+			if(CL[j]==NULL){
+				printf("out of memory\n");
+				exit(1);
+			}
+			CL[j]->G=exclude;														//o opoios einai o exclude
+			printf("***%s IS CRITICAL!\n",exclude->label);
+			iscritical=1;
+		}else
+			printf("%s is not critical\n",G[i]->label);
+
+		//kai epanaferw ton pinaka  kai ta xrwmata opws htan
+		for (iscount=0;iscount<count;iscount++){
+			matrix->table[x][iscounted[iscount]].value=1;
+			matrix->table[iscounted[iscount]][x].value=1;
+		}
+		for (again=0;again<numberofnodes;again++)
+			G[again]->clr.current=strdup(wh);
+	}
+	//ean de vrei kanena critical
+	if (iscritical==0)
+		printf("***%s and %s are reliably connected.***\n",G[(num1-1)]->label,G[(num2-1)]->label);
+	else
+		printf("***%s and %s are NOT reliably connected.***\n",G[(num1-1)]->label,G[(num2-1)]->label);
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 	Eisagwgh se oura
+==========================================================================================================================
+*/
+void pushqueue(struct Queue *q,struct vertex *Gv)
+{
+	queuelist *newinlist;
+	newinlist = (queuelist*)malloc(sizeof(queuelist));
+	if (newinlist==NULL){
+		printf("No memory available.\n");
+		exit(1);
+	}
+	newinlist->G=Gv;
+	newinlist->next=NULL;
+	if (q->tail==NULL)
+		q->head=q->tail=newinlist;
+	else{
+		q->tail->next=newinlist;
+		q->tail=newinlist;
+	}
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 	Εxagwgh apo oura
+==========================================================================================================================
+*/
+struct vertex *popqueue(struct Queue *q)
+{
+	queuelist *tmp;
+	struct vertex *newG;
+	newG=(struct vertex*)malloc(sizeof(struct vertex));
+	if (q->head==NULL){
+		printf("Nothing to remove from empty queue.\n");
+		return newG;
+	}
+	tmp=q->head;
+	newG=q->head->G;
+	q->head=q->head->next;
+	newG->clr.current=strdup(bl);	//kanw kai to xrwma tou mayro-vghke apo thn oura
+	newG->critical=TRUE;
+	free(tmp);
+	if (q->head==NULL){
+		q->tail=NULL;
+		return 0;
+	}
+	return q->head->G;				//thelw na mou epistrefei kathe fora to node tou head ths ouras
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 	Arxikopoihsh ouras
+==========================================================================================================================
+*/
+
+void init_queue(struct Queue *q)
+{
+    q->head=q->tail= NULL;
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 	       BFS
+==========================================================================================================================
+*/
+
+void Bfs(int num, int numberofnodes,struct Queue *Q)
+{
+	int y=0;
+	struct vertex *newhead;					//xrhsimopoiw wste kathe fora na antistoixw to head ths ouras
+	newhead=(struct vertex*)malloc(sizeof(struct vertex));
+	if(newhead==NULL){
+		printf("out of memory\n");
+		exit(1);
+	}
+	//ean mpainei prwth fora tote to noumero einai o prwtos arithmos pou edwsa
+	if (counter==0){
+		G[num-1]->critical=TRUE;
+		G[num-1]->pred=NULL;
+		G[num-1]->clr.current=strdup(gr);	// kai ton xrwmatizw gkri
+		pushqueue(Q,G[num-1]);				//ton vazw sthn oura
+		newhead=G[num-1];					//kai thetw ws neo head ths ouras ayton efoson tha einai adeia ews edw
+		counter=1;							//allazw to metrhth gia na mhn ksanampei me to prwto
+		}
+
+	while (newhead!=NULL){					//oso h oura den einai adeia
+		num=(newhead->pos)+1;
+		for (y=0;y<numberofnodes;y++){
+			if (matrix->table[num-1][y].value==1){
+				if (G[y]->clr.current[0]=='W'){	//kai vlepei kai leyko xrwma
+					G[y]->pred=G[num-1];
+					G[y]->critical=TRUE;
+					G[y]->clr.current=strdup(gr);
+					pushqueue(Q,G[y]);			//bazw kai ayto sthn oura
+				}
+			}
+		}
+		newhead=popqueue(Q);					//kathe fora pou teleiwnei ton elegxo enos vertex gia tis syndeseis tou afairw to head ths ouras
+	}
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 Pairnw toys arithmous nodes pou eisagei o xrhsths
+==========================================================================================================================
+*/
+
+int getnumbers(int numberofnodes,int number1)
+{
+	char innumnode[10]="\0";;
+	int numLen;
+	int number,ok;
+	int i=0;
+
+	while (fgets(innumnode,100,stdin)){
+		ok=0;
+		numLen=strlen(innumnode);
+		if(numLen<=10){						//epilegw megethos px 10 chars
+			if( innumnode[numLen-1]=='\n')
+				innumnode[numLen-1]='\0';
+			for (i=numLen-1;i<10;i++)
+				innumnode[i]='\0';
+			for (i=0;i<numLen;i++){
+				if ((innumnode[i]==' ') ||(innumnode[i]=='\n')||(innumnode[i]=='\t') ||(innumnode[i]=='\t') ||(innumnode[i]>'9')){
+					printf("***********************************************************************\n");
+					printf("This is not a valid value for node number. Please insert only  numbers.\n");
+					printf("Try again with a number from 1 to %d\n",numberofnodes);
+					printf("***********************************************************************\n");
+					ok=1;
+					break;
+				}
+			}
+			if (ok==0){
+				number=atoi(innumnode);									//metatrepw se integer
+				if (number<1 || number>numberofnodes){
+					printf("************************************************************\n");
+					printf("Invalid Node number.\nTry again with a number from 1 to %d.\n",numberofnodes);
+					printf("************************************************************\n");
+				}
+				else if (number==number1){
+					printf("************************************************************\n");
+					printf("This is the same as the starting node.\nChoose any other from 1 to %d.\n",numberofnodes);
+					printf("************************************************************\n");
+				}
+				else
+					break;
+			}
+		}
+		else{
+			printf("Too lange number input! Try again with a number from 1 to %d\n",numberofnodes);
+		}
+	}
+	printf("************************************************************\n");
+	printf("Node Number '%d' accepted.\n",number);
+	printf("************************************************************\n");
+	return number;
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 Arxikopoihsh Graphou
+==========================================================================================================================
+*/
+
+void initGraph(int numberofnodes,fileread **Node)
+{
+	int i=0;
+	for (i=0;i<numberofnodes;i++){
+		G[i]->label=strdup(Node[i]->Nname);
+		G[i]->clr.current=strdup(wh);
+		G[i]->pos=Node[i]->indexnum;
+		G[i]->critical=FALSE;
+		G[i]->pred=NULL;
+	}
+
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 Desmeysh mnhmhs gia matrix
+==========================================================================================================================
+*/
+
+void allocatematrix(int numberofnodes)
+{
+	int ip,ip2,ip3;
+	matrix=(struct ad_matrix*)malloc(sizeof(struct ad_matrix));  //o genikos pointer
+	if(matrix==NULL){
+		printf("out of memory\n");
+		exit(1);
+	}
+	matrix->size=numberofnodes;
+	matrix->table=(struct matrixtable**)malloc((matrix->size)*sizeof(struct matrixtable*));  //deixnei se kathe tableblock
+	if(matrix==NULL){
+		printf("out of memory\n");
+		exit(1);
+	}
+	for(ip=0;ip<matrix->size;ip++){
+		matrix->table[ip]=(struct matrixtable*)malloc((matrix->size)*sizeof(struct matrixtable)); //kathe tableblock pointer deixnei se seira pointers se structs
+		if(matrix->table[ip]==NULL){
+			printf("out of memory\n");
+			exit(1);
+		}
+		for(ip2=0;ip2<matrix->size;ip2++){
+			matrix->table[ip][ip2].Nodesinblock= (char**)malloc(2*sizeof(char*));
+			if(matrix->table[ip][ip2].Nodesinblock==NULL){
+				printf("out of memory\n");
+				exit(1);
+			}
+			matrix->table[ip][ip2].edgesInblock= (int**)malloc(2*sizeof(int*));
+			if(matrix->table[ip][ip2].edgesInblock==NULL){
+				printf("out of memory\n");
+				exit(1);
+			}
+			for (ip3 = 0 ; ip3 < 2; ip3++){
+				matrix->table[ip][ip2].Nodesinblock[ip3] = (char*)malloc(MAXSTRSIZE*sizeof(char));
+				if(matrix->table[ip][ip2].Nodesinblock[ip3]==NULL){
+					printf("out of memory\n");
+					exit(1);
+				}
+				matrix->table[ip][ip2].edgesInblock[ip3] = (int*)malloc(2*sizeof(int));
+				if(matrix->table[ip][ip2].edgesInblock[ip3] ==NULL){
+					printf("out of memory\n");
+					exit(1);
+				}
+			}
+		}
+	}
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 Apodesmeysh mnhmhs
+==========================================================================================================================
+*/
+
+void freemem(int numberofnodes){
+	int i;
+	for (i = 0 ; i < numberofnodes ; i++){
+		free(Node[i]);
+		free(G[i]);
+		free (matrix->table[i]);
+		free (Node[i]->mirror);
+		free (Node[i]->edge);
+	}
+	free(Node);
+	free (matrix->table);
+	free(matrix);
+	free (G);
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	Desmeysh mnhmhs gia Vertex **G
+==========================================================================================================================
+*/
+
+void allocateG(int numberofnodes)
+{
+	int i=0;
+	//desmeyw mnhmh gia pointer array
+	G=(Vertex**)malloc(numberofnodes*sizeof(Vertex*));
+	if(G== NULL){
+		printf("out of memory\n");
+		exit(1);
+	}
+	//desmeyw mnhmh gia ka8e element tou pointer array
+	for (i = 0 ; i < numberofnodes ; i++){
+		G[i] = (Vertex*)malloc(sizeof(Vertex));
+		if(G[i]== NULL){
+			printf("out of memory\n");
+			exit(1);
+		}
+	}
+}
+/*
+==========================================================================================================================
+                          	  	  	  	 Desmeysh mnhmhs gia fileread **Node
+==========================================================================================================================
+*/
+
+void allocateNode(int numberofnodes)
+{
+	int i,j,k;
+
+	//desmeyw mnhmh gia pointer array
+	Node=(fileread**)malloc(numberofnodes*sizeof(fileread*));//desmeyw gia ton pointer pou tha deixnei se array of pointers twn nodes
+	if(Node== NULL){
+		printf("out of memory\n");
+		exit(1);
+	}
+	for (i = 0 ; i < numberofnodes ; i++){
+		Node[i] = (fileread*)malloc(sizeof(fileread));    //desmeyw gia kathe pointer pou tha deixnei se kathe Node
+		if(Node[i]== NULL){
+			printf("out of memory\n");
+			exit(1);
+		}
+		Node[i]->edge=(int**)malloc((numberofnodes*(numberofnodes-1)/2)*sizeof(int*));  //desmeyw gia kathe pointer pou tha deixnei se array of pointers twn edges twn nodes
+		if(Node[i]->edge== NULL){
+			printf("out of memory\n");
+			exit(1);
+		}
+		for (k = 0 ; k < numberofnodes*(numberofnodes-1)/2; k++){
+			Node[i]->edge[k] = (int*)malloc(sizeof(int [2]));
+			Node[i]->edge[k][0] = 0;
+			Node[i]->edge[k][1] = 0;
+			if((Node[i]->edge[k]== NULL)){
+				printf("out of memory\n");
+				exit(1);
+			}
+		}
+		Node[i]->mirror=(int**)malloc((numberofnodes*(numberofnodes-1)/2)*sizeof(int*)); //afou einai mh kateythinomenos ta edges tha einai max n(n-1)2 opou n ta nodes
+		for (j = 0 ; j < numberofnodes*(numberofnodes-1)/2 ; j++){
+			Node[i]->mirror[j] = (int*)malloc(sizeof(int [2]));
+			Node[i]->mirror[j][0] = 0;
+			Node[i]->mirror[j][1] = 0;
+			if((Node[i]->mirror[j]== NULL)){
+				printf("out of memory\n");
+				exit(1);
+			}
+		}
+	}
+}
+
+
+/*
+==========================================================================================================================
+                          	  	  	  	 Pairnw string apo kathe grammh gia onoma vertex
+==========================================================================================================================
+*/
+
+char *getNodeNamefromline(char array[], char* arraynode,int cLine)
+{
+	for (letter=0;letter<MAXSTRSIZE;letter++)
+		if((array[0]=='N')&& (array[1]=='o')&& (array[2]=='d')&& (array[3]=='e')&& (array[4]=='_')&& (array[5]>=65) && (array[5]<90)&& (array[6]=='\0')){
+			arraynode[letter]=array[letter];
+		}
+		else if ((array[0]=='\0')){
+			printf("***********************************************************************\n");
+			printf("Check your file. Last scanned line %d is empty.\n",cLine+1);
+			printf("***********************************************************************\n");
+			exit(1);
+		}
+		else if (array[6]!='\0'){
+			printf("***********************************************************************\n");
+			printf("Invalid node name: %s in line %d in your file.\n",array,cLine+1);
+			printf("I can deal with nodes only from Node_A to Node_Z with this exact format.\n");
+			printf("I need to be updated so i can deal with more Nodes.Sorry! :)\n");
+			printf("***********************************************************************\n");
+			exit(1);
+		}else {
+			printf("***********************************************************************\n");
+			printf("Invalid node name: %s in line %d in your file.\n",array,cLine+1);
+			printf("I can deal with nodes only from Node_A to Node_Z with this exact format.\n");
+			printf("***********************************************************************\n");
+			exit(1);
+		}
+	return arraynode;
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 Pairnw ta noumera apo kathe grammh tou arxeiou
+==========================================================================================================================
+*/
+
+int getnumberfromline(char array[], int cLine)
+{
+	int number;													//tha mou epistrefei ton integer
+	char numberedge[15]="\0";									//ton xrhsimopoiw gia na gemizw me to string pou periexei ton arithmo
+	int i_edge=0;
+	int letter_f=0;
+
+	if (letter==0){												//ean mpei sthn arxh tou string na diavasei ton prwto arithmo
+		for ((letter)=0;(letter)<MAXSTRSIZE;(letter)++){
+			if((array[letter]!='\0')&& (array[letter]!='\n')&& (array[letter]!='\t')&& (array[letter]!=' ') && array[letter]<='9'){
+				numberedge[letter]=array[letter];
+			}else if ((letter==0) && ((array[letter]=='\0')|| (array[letter]=='\t')|| (array[letter]=='\n')|| (array[letter]!=' '))){
+				printf("***********************************************************************\n");
+				printf("Check your file. Line %d is in invalid format (or empty).\n",cLine+1);
+				printf("***********************************************************************\n");
+				exit(1);
+			}else if (array[letter]>'9'){
+				printf("****************************************************************************************\n");
+				printf("Check your file. You have invalid character '%c' in your number input after number: %d\n",array[letter],array[letter-1]);
+				printf("Need valid numbers for example: 1 2\n");
+				printf("Stopped accepting number after:'%s' in line %d.\n",numberedge,cLine+1);
+				printf("****************************************************************************************\n");
+				exit(1);
+			}else
+				break;
+		}
+	}else if (array[letter]=='\0' || array[letter]=='\t'|| array[letter]=='\n'||array[letter]==' '){    //an mpei meta ton prwto arithmo
+		letter_f=letter;											//gia elegxo an exei perasei me epityxia ton prwto arithmo
+		for (letter=letter+1;letter<MAXSTRSIZE;letter++){
+			if ((array[letter]!='\0')&& (array[letter]!='\n')&& (array[letter]!='\t')&& (array[letter]!=' ') && array[letter]<='9'){
+				numberedge[i_edge]=array[letter];
+				i_edge++;
+			}else if (((letter!=letter_f) && ((array[letter]=='\t')||(array[letter]==' ')||(array[letter]>'9')))||(array[letter]>'9')){
+				printf("****************************************************************************************\n");
+				printf("Check your file. You have invalid character '%c' in your number input after number: %c\n",array[letter],array[letter-1]);
+				printf("Or you are trying to pass 3 numbers in one line. Need valid numbers for example: '1 2'.\n");
+				printf("Stopped accepting number after:'%s'\n",numberedge);
+				printf("****************************************************************************************\n");
+				exit(1);
+			}else
+				break;
+		}
+	}
+	number=atoi(numberedge);									//metatrepw se integer
+	return number;
+}
+
+
+
+/*
+==========================================================================================================================
+                          	  	  	  	 Diavasma arxeiou
+==========================================================================================================================
+*/
+
+int readfromFile(FILE *ptofile)
+{
+
+	int v=0;
+	int inLineNodeNum=0;
+	int inLineNodeEdge=0;
+	int e=0;
+	int putedge=0;
+	int countLine=0;
+	char nodeStr[MAXSTRSIZE];
+	char fileline[MAXSTRSIZE]="\0";
+	char *NodeName;
+	int lineLen;
+	int n=0;
+	int ok=0;
+	int y=0;
+	int m=0;
+	int x=0;
+	int mir_count=0;
+	int putmirror=0;
+	int yes=0;
+	int yes2=0;
+	int putmirafter;
+
+	printf("_____________________________Process Info______________________________\n");
+	printf("\nReading.........\n\n");
+
+	while(fgets(fileline,MAXSTRSIZE,ptofile)){  	//anagnwsh grammwn
+		if (fileline!=NULL){
+			lineLen=strlen(fileline);
+			if(fileline[lineLen-1]=='\n' || fileline[lineLen-1]=='\r' ){    //epeidh to fgets krataei to newline sto telos to kanw 0 gia na exei th morfh eswterika
+				if (fileline[lineLen-2]=='\r')								//epeidh kapoia stigmh mou evlepe to \r sto telos kai katebaine sthn epomenh grammh se \n to thetw gia elegxo kai ayto
+					fileline[lineLen-2]='\0';
+				for (letter=lineLen-1;letter<MAXSTRSIZE;letter++)
+					fileline[letter]='\0';
+				printf("%s\n",fileline);
+			}
+			else if (fileline[lineLen+1]=='\0')
+				printf("%s\n",fileline);
+
+			//sth grammh 0 pairnei ton arithmo twn vertex kai twn edges
+			if ((countLine==0) && (fileline!=NULL)){
+				letter=0;
+				v=getnumberfromline(fileline,countLine);					//arithmos vertex
+				e=getnumberfromline(fileline,countLine);					//arithmos edges
+				if ((e>(v*(v-1)/2))){
+					printf("********************************************************************************************************\n");
+					printf("I cannot handle these values v=%d and e=%d. I need max Edges=Vertexs(Vertexs-1)/2 for this graph type.\n",v,e);
+					printf("********************************************************************************************************\n");
+					exit(1);
+				}else if (v>9){
+					printf("********************************************************************************************************\n");
+					printf("Sorry %d is too Large for me.Try max 9 vertexs in your input file or wait for next updated version! :P\n",v);
+					printf("********************************************************************************************************\n");
+					exit(1);
+				}
+				countLine=1;												//na mpainei sthn epomenh grammh thn epomenh fora
+				allocateG(v);
+				allocateNode(v);
+			}
+			else if ((countLine>0)&&(countLine<=v+e)&&(fileline!=NULL)){
+				//ean paei stis grammes apo 1 ews arithmo vertex pairnei ta onomata twn vertex
+				if ((countLine>0)&&(countLine<v+1)){
+					letter=0;
+					NodeName=getNodeNamefromline(fileline,nodeStr,countLine);
+					Node[inLineNodeNum]->Nname=strdup(NodeName);
+					printf("------------->Nodename is:%s\n",Node[inLineNodeNum]->Nname);
+					for (x=0;x<inLineNodeNum;x++){
+						if (Node[inLineNodeNum]->Nname[5]<Node[x]->Nname[5]){
+							printf("********************************************************************************************************\n");
+							printf("Wrong order for node names:Nodename %s should be before %s\n",NodeName,Node[x]->Nname);
+							printf("********************************************************************************************************\n");
+							exit(1);
+						}else if ((Node[inLineNodeNum]->Nname[5]==Node[x]->Nname[5])){
+							printf("********************************************************************************************************\n");
+							printf("I have already stored this node: %s.\nCheck your file and try again.\n",NodeName);
+							printf("********************************************************************************************************\n");
+							exit(1);
+						}
+					}
+					Node[inLineNodeNum]->indexnum=inLineNodeNum;
+					printf("------------->Node pos is:%d\n",Node[inLineNodeNum]->indexnum);
+					inLineNodeNum++;
+				}
+				//stis grammes meta apo v+1 pairnw ta zeygaria twn edges
+				else if ((countLine>=v+1)&&(countLine<=v+e)){
+					letter=0;
+					putedge=0;
+					ok=0;
+					n=getnumberfromline(fileline,countLine);  //o prwtos arithmos tou zeygous
+					if (n>v){
+						printf("********************************************************************************************************\n");
+						printf("Number %d is not a valid number for node. We have only %d nodes\n",n,v);
+						printf("********************************************************************************************************\n");
+						exit(1);
+					}
+					while (ok==0){										//gia na tsekarei an exei hdh gemato edge[i][j] kai na proxwra sto epomeno
+						if (n>=(Node[inLineNodeEdge]->indexnum+1)){		//to inLineNodeEdge einai gia na elegksei ena ena ola ta nodes enw to putedge ta edges tou kathe node
+							if (n==(Node[inLineNodeEdge]->indexnum+1)){
+								if (Node[inLineNodeEdge]->edge[putedge][0]==0){ //ean einai adeio to prwto edge to vazei ekei alliws paei sto epomeno
+									Node[inLineNodeEdge]->edge[putedge][0]=Node[inLineNodeEdge]->indexnum+1; //vazw sto edge[i][0] to noumero pou diavazw kai antistoixei sto indexnum+1
+									printf("------------->1st point is:%d\n",Node[inLineNodeEdge]->edge[putedge][0]);
+									ok=1;
+								}else
+									putedge++;
+							}else
+								inLineNodeEdge++;
+						}
+						else{
+							printf("********************************************************************************************************\n");
+							printf("Order of first edges is wrong.\n");
+							printf("%d in line %d is less than %d in line %d. Check your file and try again.\n",n,countLine+1,Node[inLineNodeEdge]->edge[putedge][0],countLine);
+							printf("Stopped on line %d.\n",countLine+1);
+							printf("********************************************************************************************************\n");
+							exit(1);
+						}
+					}
+					//deyteros arithmos tou zeygous
+					m=getnumberfromline(fileline,countLine);
+					if (Node[inLineNodeEdge]->edge[putedge][1]==0){
+						yes=0;
+						Node[inLineNodeEdge]->edge[putedge][1]=m;
+						if (m>v){
+							printf("********************************************************************************************************\n");
+							printf("Number %d is not a valid number for node. We have only %d nodes\n",m,v);
+							printf("********************************************************************************************************\n");
+							exit(1);
+						}
+						printf("------------->2st point is:%d\n",Node[inLineNodeEdge]->edge[putedge][1]);
+						printf("------------->Edge is:%d %d for node %s\n",Node[inLineNodeEdge]->edge[putedge][0],Node[inLineNodeEdge]->edge[putedge][1],Node[inLineNodeEdge]->Nname);
+
+						//na mpainoun ta mirror edges sto Node pou antistoixoun
+						putmirror=0;
+						mir_count=0;
+						yes2=0;
+						putmirafter=0;
+						while(yes==0){
+							if (((Node[mir_count]->indexnum)+1)==Node[inLineNodeEdge]->edge[putedge][1]){
+								if ((Node[mir_count]->edge[putmirror][0]==0)){
+									Node[mir_count]->edge[putmirror][0]=Node[inLineNodeEdge]->edge[putedge][1];
+									Node[mir_count]->edge[putmirror][1]=Node[inLineNodeEdge]->edge[putedge][0];
+									printf("------------->Edge is:%d %d for node %s\n",Node[mir_count]->edge[putmirror][0],Node[mir_count]->edge[putmirror][1],Node[mir_count]->Nname);
+									yes=1;
+
+									//ta apothikeyw kai ws mirror sto node pou vrethike prwta h enwsh
+									while (yes2==0){
+										if ((Node[inLineNodeEdge]->mirror[putmirafter][0]==0)){
+											Node[inLineNodeEdge]->mirror[putmirafter][0]=Node[mir_count]->edge[putmirror][0];
+											Node[inLineNodeEdge]->mirror[putmirafter][1]=Node[mir_count]->edge[putmirror][1];
+											printf("------------->Mirror Edge is:%d %d for node %s\n",Node[inLineNodeEdge]->mirror[putmirafter][0],Node[inLineNodeEdge]->mirror[putmirafter][1],Node[inLineNodeEdge]->Nname);
+											yes2=1;
+										}else
+											putmirafter++;
+									}
+								}else
+									putmirror++;
+							}else
+								mir_count++;
+						}
+						if (m>v){
+							printf("********************************************************************************************************\n");
+							printf("Number %d is not a valid number for edge. We have only %d nodes\n",m,v);
+							printf("Stopped on %d %d in line %d.\n",Node[inLineNodeEdge]->edge[putedge][0],Node[inLineNodeEdge]->edge[putedge][1],countLine+1);
+							printf("********************************************************************************************************\n");
+							exit(1);
+						}
+						else if (Node[inLineNodeEdge]->edge[putedge][1]==Node[inLineNodeEdge]->edge[putedge][0]){
+							printf("********************************************************************************************************\n");
+							printf("You cannot have a line with same two edges in this type of graph.\nCheck your file and try again.\n");
+							printf("Stopped on %d %d in line %d.\n",Node[inLineNodeEdge]->edge[putedge][0],Node[inLineNodeEdge]->edge[putedge][1],countLine+1);
+							printf("********************************************************************************************************\n");
+							exit(1);
+						}
+						else if ((Node[inLineNodeEdge]->edge[putedge][0])>(Node[inLineNodeEdge]->edge[putedge][1])){
+							printf("********************************************************************************************************\n");
+							printf("Put %d %d in valid order and check again your file.\nFirst number must be the smallest\n",Node[inLineNodeEdge]->edge[putedge][0],Node[inLineNodeEdge]->edge[putedge][1]);
+							printf("Stopped on line %d.\n",countLine+1);
+							printf("********************************************************************************************************\n");
+							exit(1);
+						}
+						else
+							for (y=0;y<putedge;y++){
+								if (n &&(Node[inLineNodeEdge]->edge[putedge][1])==(Node[inLineNodeEdge]->edge[y][1])){
+									printf("********************************************************************************************************\n");
+									printf("I have already stored this edge: %d %d.Check your file and try again.\n",n,Node[inLineNodeEdge]->edge[putedge][1]);
+									printf("Stopped on line %d.\n",countLine+1);
+									printf("********************************************************************************************************\n");
+									exit(1);
+								}
+								else if  (n &&(Node[inLineNodeEdge]->edge[putedge][1])<(Node[inLineNodeEdge]->edge[y][1])){
+									printf("********************************************************************************************************\n");
+									printf("Put %d %d in valid order and check again your file.\n",n,Node[inLineNodeEdge]->edge[putedge][1]);
+									printf("Edge %d %d has to be over %d %d.\nFirst number must be the smallest.\n",n,Node[inLineNodeEdge]->edge[putedge][1],n,Node[inLineNodeEdge]->edge[y][1]);
+									printf("Stopped on line %d.\n",countLine+1);
+									printf("********************************************************************************************************\n");
+									exit(1);
+								}
+							}
+					}
+				}
+				for (letter=0;letter<MAXSTRSIZE;letter++)
+					fileline[letter]='\0';					//oti menei to kanw \0 gia asfaleia
+				countLine++;								//ayksanw kata 1 th grammh
+				}
+			else if (countLine>v+e){
+				printf("********************************************************************************************************\n");
+				printf("Number of lines in given file are more than %d+%d+1=%d as required.\n",v,e,v+e+1);
+				printf("Check it and try again.\n");
+				printf("********************************************************************************************************\n");
+				exit(1);
+			}
+		}
+	}
+	if (countLine<=v+e && (fileline[0]=='\0' || fileline[0]=='\n')){
+		printf("********************************************************************************************************\n");
+		printf("Number of lines in given file are less than %d+%d+1=%d as required.\n",v,e,v+e+1);
+		printf("Check it and try again.\n");
+		printf("********************************************************************************************************\n");
+		exit(1);
+	}
+	printf("\n__________________________Process Info: END____________________________\n\n");
+	return v;												//thelw na epistrefei ton arithmo twn vertex
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	      Thema 1: Dhmiourgia pinaka
+==========================================================================================================================
+*/
+void createMatrix(int numberofnodes)
+{
+	int i,x,w,y,isOk,yes;
+
+	allocatematrix(numberofnodes);
+	printf("\nThe adjancency matrix is the following:\n");
+	printf("\n");
+	for (x=0;x<=numberofnodes+1;x++){
+		isOk=0;
+		//h prwth grammh
+		if (x==0){
+			for (y=0;y<numberofnodes;y++)
+				printf("%d ",y+1);
+			printf("\n");
+		}
+		else if (x==numberofnodes+1)
+			break;
+		else{
+			for (y=0;y<numberofnodes+2;y++){
+
+				//edw tha einai h onomasia twn Node kai h arithmhsh katheta
+				if (y==numberofnodes)
+					printf("%d: ",x);
+				else if (y==numberofnodes+1){
+					i=0;
+					while (isOk==0){
+						if (G[i]->pos+1==x){
+							printf("%s\n",G[i]->label);
+							isOk=1;
+						}
+						else
+							i++;
+					}
+				}
+				//edw dhmiourgeitai o pinakas geitniashs
+				else{
+					yes=0;
+					w=0;
+					while (yes==0){
+						if (Node[x-1]->edge[w][1]==y+1){
+							matrix->table[x-1][y].Nodesinblock[0]=Node[x-1]->Nname;
+							matrix->table[x-1][y].Nodesinblock[1]=Node[y]->Nname;
+							matrix->table[x-1][y].edgesInblock[0]=Node[x-1]->edge[w];
+							matrix->table[x-1][y].value=1;
+							printf("%d ",matrix->table[x-1][y].value);
+							yes=1;
+						}else if (Node[x-1]->edge[w][1]>y || Node[x-1]->edge[w][1]==0){      //exei ftasei sto telos kai gia asfaleia an einai megalytero
+							matrix->table[x-1][y].Nodesinblock[0]=Node[x-1]->Nname;
+							matrix->table[x-1][y].Nodesinblock[1]=Node[x-1]->Nname;
+							matrix->table[x-1][y].edgesInblock[0]=0;
+							matrix->table[x-1][y].edgesInblock[1]=0;
+							matrix->table[x-1][y].value=0;
+							printf("%d ",matrix->table[x-1][y].value);
+							yes=1;
+						}else w++;
+					}
+				}
+			}
+		}
+	}
+	printf("\n");
+}
+/*
+==========================================================================================================================
+                          	  	  	  	      Arxika info
+==========================================================================================================================
+*/
+
+void info()
+{
+	printf("1. This program tests if two computing devices are connected reliably in a wireless network.\n");
+	printf("2. Two devises are supposed to be connected unreliably if the connection between them can be destroyed by removing just one device from the network.\n");
+	printf("3. The wireless network is modeled as a graph where the vertices are computing devices located in physical space.\n");
+	printf("4. The graph contains an edge (u,v) if device v is close enough to device u to receive and to transmit signals.\n");
+	printf("\nThe data structure used for the connectivity of vertices is an adjacency matrix.\n");
+	printf("The graph traversal method is based on the Breadth-First-Search method.\n\n");
+	printf("********************************************************************************************************************************************************\n");
+	printf("\t\t\t\t TEST on simple graphs\n\t\t\t\t\tPLS50-E7\n\t\t\t\tby Elena Theodoropoulou\n");
+	printf("********************************************************************************************************************************************************\n\n");
+}
