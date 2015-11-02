@@ -1,0 +1,444 @@
+/*
+ *  Created on: Oct 23, 2011
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define YSIZE 8						//Ari8mos grammwn skakieras
+#define XSIZEMAX 104				//Megisth ari8mhsh sthlwn skakieras (gramma 'h')
+#define XSIZEMIN 97					//Elaxisth ari8mhsh sthlwn skakieras (gramma 'a')
+#define RECT 8						//Megistos ari8mos sthlwn tetragwnwn
+#define MOVESIZE 50					//Mege8os pinaka (thema 3 kai 4)
+#define STRLENGTH 32				//Mege8os pinaka (thema 5)
+
+//Archetypa synarthsewn
+void menu();
+void chess();
+void checkmoves();
+void WBwrite();
+void stringcheck();
+void copy();
+void help();
+
+/*
+==================================================================
+MAIN PROGRAM
+==================================================================
+*/
+
+int main()
+{
+	FILE *fp;
+	char c,ctemp;
+	//Emfanish main menu
+	do {
+		menu();
+		do {
+			scanf("%c", &c);
+			if (c=='\n'){				//Sthn periptwsh epanalhpshs elegxw an exei krathsei kapoio newline
+				scanf("%c", &c);
+			}
+			while ((ctemp=getchar())!='\n');
+		}while (c!='d' && c!='v' && c!='s' && c!='f'&& c!='e');
+
+		//Epiloges xrhsth
+		switch (c){
+		case 'd': chess();break;				//Emfanish skakieras
+		case 'v': checkmoves();break;			//Elegxos kinhsewn
+		case 's':								//Elegxos leykwn-mayrwn kinhsewn & eggrafh se arxeio
+			fp = fopen("moves.txt","w");		//Gia na anoigei ka8aro arxeio ka8e fora
+			if (fp == NULL){
+				printf("Error in opening file");
+				exit(1);
+			}
+			fclose(fp);
+
+			do{
+				WBwrite();						//Ektelesh elegxou kinhsewn kai eggrafhs sto arxeio
+				//Otan teleiwnei h synarthsh na rwtaei an o xrhsths 8elei na epanalabei h oxi
+				do{
+					scanf("%c", &c);
+					while ((ctemp=getchar())!='\n');
+					if(c=='n')
+						break;
+					else if (c!='y')
+						printf("Please try again.y=Yes: to continue/ n=No: to exit to main menu\n");
+				}while(c!='n'&& c!='y');
+			}while (c=='y');
+			break;
+		case 'f':stringcheck();break;			//Elegxos egkyrwn kinhsewn se string
+		default:								//Exodos se main menu
+			c='e';
+			break;
+		}
+	}while (c!='e');
+	printf("***Program end***\n");
+	return 0;
+}
+
+/*----------------------------------------------------------------------------------------*/
+//ORISMOS SYNARTHSEWN
+
+/*
+==================================================================
+Thema 1: EMFANISH MENU
+==================================================================
+*/
+
+void menu()
+{
+	printf("\t==MAIN MENU==\n");
+	printf("[d] Display Empty Chess Board\n");
+	printf("[v] Check Validity of Chess Notation\n");
+	printf("[s] Save Moves to a Text File\n");
+	printf("[f] Find Chess Moves in a String\n");
+	printf("[e] End Program\n");
+	printf("Selection [d, v, s, f, e]:\n");
+}
+
+/*
+==================================================================
+Thema 2: SKAKIERA
+==================================================================
+*/
+
+void chess()
+{
+	int i,k,j;
+	char c1;
+
+	if (YSIZE<=9 && YSIZE>=0){			/*Panw apo 9 xanetai h zhtoumenh enallax stoixish*/
+
+		//Dhmiourgia grammhs ari8mhshs sthlwn me grammata
+		for (i=YSIZE;i>=0;i--){
+			if (i==0){
+				printf(" ");			//Keno sth 8esh 0
+				for (j=XSIZEMIN;j<=XSIZEMAX;j++)
+					printf("%c",j);
+			}
+
+			//Dhmiourgia sthlhs ari8mhshs grammwn
+			else {
+				printf("%d",i);
+
+				//Kai se ka8e grammh dhmioyrgia tetragwnwn
+				for (k=0;k<RECT;k++){
+					if (i%2!=0){
+						if (k%2==0){
+							printf("%c",' ');
+						}
+						else
+							printf("%c",219);
+					}
+					else if (k%2==0)
+						printf("%c",219);
+					else
+						printf("%c",' ');
+				}
+			}
+			printf("\n");
+		}
+	}											/*Panw apo 9 xanetai h zhtoumenh enallax stoixish*/
+	else{
+		printf("*****Invalid Line Number*****");
+	}
+	printf("Press any key to go to main selection menu.\n");
+
+	//Ka8arisma endexomenwn ypoleipomenwn stoixeiwn tou stdin
+	while((c1 = getchar()) != EOF && c1 != '\n')
+	{
+		if (c1=='\n'){					//Ka8arisma endexomenwn ypoleipomenwn newline
+			scanf("%c", &c1);
+		}
+		else
+			continue;
+	}
+}
+
+/*
+==================================================================
+Thema 3: ELEGXOS KINHSEWN
+==================================================================
+*/
+
+void checkmoves()
+{
+	char str[MOVESIZE]="\0"; 				//Arxikopoihsh pinaka
+	int movelen;							//Input xrhsth
+	help();									//Info
+	printf("Enter your move (or Press '#' to exit to main menu):\n");
+
+	do {
+		//O xrhsths dinei kinhsh
+		fgets(str,MOVESIZE,stdin);
+		movelen = strlen(str);
+
+		if (movelen<=15){						//Epilegw na elegxw thn kinhsh mexri 15 xarakthres.
+
+			if (str[0]!='\0' && str[0] !='\n'){ //Na mhn mpainei sto loop prin ton xrhsth
+
+				//Elegxos kinhsewn
+				//Me tria stoixeia (ean 8a vrei eidos pioniou)
+				if (str[0]=='K'||str[0]=='Q'||str[0]=='R'||str[0]=='N'||str[0]=='B'||str[0]=='P'){
+					if  (str[1]>=97 && str[1]<=104){
+						if (str[2]>='1' && str[2]<='8' && str[3]=='\n'){
+							str[3]='\0';
+							printf("%s is true move!!!\n",str);
+							printf("Try again (or Press '#' to exit to main menu).\n");
+						}
+						else
+							printf("Please try again (or Press '#' to exit to main menu)\n");
+					}
+					else
+						printf("Please try again (or Press '#' to exit to main menu)\n");
+				}
+
+				//Me dyo stoixeia ws syntetagmenes(ennoeitai to P ws pioni)
+				else if (str[0]>=97 && str[0]<=104){
+					if (str[1]>='1' && str[1]<='8' && str[2]=='\n'){
+						str[2]='\0';
+						printf("Yes your move is correct! %s is move P%s.\n",str,str);
+						printf("Try again (or Press '#' to exit to main menu).\n");
+					}
+					else
+						printf("Please try again (or Press '#' to exit to main menu).\n");
+				}
+
+				//Se ka8e allh periptwsh-ean bre8ei akyro stoixeio
+				else {
+					if(str[0]=='#'){	//ean o xrhsths dwsei #
+						break;			//to programma bgainei apo ton elegxo
+					}
+					printf("Please try again (or Press '#' to exit to main menu).\n");
+				}
+			}
+		}									//Ean einai panw apo 15 oi xarakthres
+		else
+			printf("Too long input. Please Try again.\n");
+	}while (str[0]!='#');
+	printf("***Return to main menu***\n\n");
+}
+
+/*
+==================================================================
+Thema 4: ELEGXOS BL/WH EGKYRWN KINHSEWN / EGGRAFH SE ARXEIO
+==================================================================
+*/
+void WBwrite()
+{
+	FILE *fp;
+	char moveWB[MOVESIZE]="\0";	//Arxikopoihsh
+	char white[4]="\0";			//Arxikopoihsh pinaka egkyrhs kinhshs leykwn
+	char black[4]="\0";			//Arxikopoihsh pinaka egkyrhs kinhshs mayrwn
+	int done,color;
+	int movelen;				//Input xrhsth
+	done=0;						//Arxikh katastash = akyrh kinhsh
+	color=0;					//Arxikh katastash enallaghs sto xrwma pioniou
+
+	printf("Please give white move:\n");
+
+	do{
+		//Dinei o xrhsths kinhsh gia leyka/mayra
+		fgets(moveWB,MOVESIZE,stdin);
+		movelen = strlen(moveWB);
+
+		if (movelen<=15){		//Epilegw na elegxw thn kinhsh mexri 15 xarakthres.
+
+			if (moveWB[0]!='\0' && moveWB[0] !='\n'){ /*Gia na mhn mpainei sto loop
+														prin to input tou xrhsth*/
+				//Elegxos kinhsewn
+				//Me tria stoixeia (ean 8a vrei eidos pioniou)
+				if (moveWB[0]=='K'||moveWB[0]=='Q'||moveWB[0]=='R'||moveWB[0]=='N'||moveWB[0]=='B'||moveWB[0]=='P'){
+					if  (moveWB[1]>=97 && moveWB[1]<=104){
+						if (moveWB[2]>='1' && moveWB[2]<='8' && moveWB[3]=='\n'){
+							moveWB[3]='\0';
+							done=1;						//Vre8ike egkyrh kinhsh/allazei o metrhths
+							if (color==0){
+								printf("White move ok!!!\n");
+								copy(white, moveWB);	//Antigrafh egkyrhs kinhshs se neo array
+								printf("Please give black move.\n");
+								done=0;
+								color=1;				//Allazei to elegxomeno xrwma pioniou
+							}
+							else if (color==1){
+								copy(black, moveWB);	//Antigrafh egkyrhs kinhshs se neo array
+								printf("Black move ok!!!\n");
+							}
+						}
+						else
+							printf("Please try again.\n");
+					}
+					else
+						printf("Please try again.\n");
+				}
+
+				//Me dyo stoixeia ws syntetagmenes (ennoeitai to P ws pioni)
+				else if (moveWB[0]>=97 && moveWB[0]<=104){
+					if (moveWB[1]>='1' && moveWB[1]<='8' && moveWB[2]=='\n'){
+						moveWB[2]='\0';
+						done=1;							//Vre8ike egkyrh kinhsh/allazei o metrhths
+						if (color==0){
+							printf("White move ok!!!\n");
+							//Antigrafh egkyrhs kinhshs se neo array
+							//copy(black, moveWB);		//An 8elw na graftei xwris to P sto arxeio
+														//to bgazw apo sxolio kai delete tis 3 parakatw
+							white[0]='P';
+							white[1]=moveWB[0];
+							white[2]=moveWB[1];
+							printf("Please give black move.\n");
+							done=0;
+							color=1;					//Allazei to elegxomeno xrwma pioniou
+						}
+						else if (color==1){
+							//Antigrafh egkyrhs kinhshs se neo array
+							//copy(black, moveWB);		//An 8elw na graftei xwris to P sto arxeio
+														//to bgazw apo sxolio kai delete tis 3 parakatw
+							black[0]='P';
+							black[1]=moveWB[0];
+							black[2]=moveWB[1];
+							printf("Black move ok!!!\n");
+						}
+					}
+					else
+						printf("Please try again.\n");
+
+				//Se ka8e allh periptwsh/ean bre8ei akyro stoixeio
+				}
+				else
+					printf("Please try again.\n");
+			}
+		}
+		else										//Ean einai panw apo 15 oi xarakthres
+			printf("Too long input. Try again\n");
+	}while(done==0);
+
+	//Eggrafh se arxeio
+	fp = fopen("moves.txt","a");					//Anoigma arxeiou gia eggrafh kinhsewn me elegxo
+	if (fp == NULL){
+		printf("Error in opening file");
+		exit(1);
+	}
+	fprintf(fp,"%3s %3s\n", white, black);			//Eggrafh kinhsewn sto arxeio
+	fclose(fp); 									//Kleisimo arxeiou
+	printf("Moves written to file.\n");
+	printf("Do you want to continue?(y/n)\n");
+
+}
+
+/*
+==================================================================
+Thema 4: ANTIGRAFH PINAKA SE ALLON
+==================================================================
+*/
+void copy(char *str1, char *str2)
+{
+	int i;
+	for (i=0;(str1[i]=str2[i])!='\0';i++)
+		;
+}
+
+/*
+==================================================================
+Thema 5: EYRESH EGKYRWN KINHSEWN SE STRING
+==================================================================
+*/
+
+void stringcheck()
+{
+	char str[STRLENGTH]="\0"; 					//Arxikopoihsh pinaka
+	char true[4]="\0";							//Pinakas egkyrhs kinhshs
+	char ch;
+	int i;
+	int done; 									//Metrhths katastashs egkyrhs-akyrhs kinhshs
+	int len;									//Input xrhsth
+	int isLarger=0;								//Katastash string: mikrotero twn 30 xarakthrwn
+
+	printf("Give your string.\n");
+
+	//o xrhsths dinei string
+	fgets(str,STRLENGTH,stdin);
+									//O xarakthras 30 tha xrhsimopoih8ei ws xarakthras elegxou
+	if (str[30] != '\0'){						//O xrhsths edwse 31 xarakthres opote
+		str[30] = '\0';							//Kanw to string 30 xarakthrwn kai ton 31 NULL
+		isLarger =1;							//Katastash string: megalutero twn 30 xarakthrwn
+		}
+	len = strlen(str);
+	printf("Kept Length is %d.\nString to examine is %s\n",len,str);
+	i=0;
+	done=0;
+
+	//Elegxos eyreshs egkyrwn kinhsewn sto string
+	do{
+		//Otan briskei eidos pioniou.Egkyrh me tria stoixeia
+		if (str[i]=='K'||str[i]=='Q'||str[i]=='R'||str[i]=='N'||str[i]=='B'||str[i]=='P'){
+			true[0]=str[i];
+			i++;
+			if  (str[i]>=97 && str[i]<=104){
+				true[1]=str[i];
+				i++;
+				if (str[i]>='1' && str[i]<='8'){
+					true[2]=str[i];
+					true[3]='\0';
+					printf("%s\n",true);
+					done=1;						//Vre8ike egkyrh.allazei o metrhths
+				}else
+					i--;
+			}else
+				;
+
+		//Otan briskei egkyrh syntetagmenh (ennoeitai to P ws pioni)
+		}else if (str[i]>=97 && str[i]<=104){
+			true[0]=str[i];
+			i++;
+			if (str[i]>='1' && str[i]<='8'){
+				true[1]=str[i];
+				true[2]='\0';
+				printf("%s is P%s\n",true,true);
+				done=1;							//Vre8ike egkyrh.allazei o metrhths
+			}else
+				;
+		}else
+			i++;
+	}while (i<=len);
+	if (done==0){								//Ean den exei bre8ei egkyrh
+		printf("No valid moves found in string.\n");
+	}
+	printf("Press any key to exit to main menu.\n");
+
+	//Ka8arisma endexomenwn ypoleipomenwn stoixeiwn tou stdin
+	if (isLarger == 1){							//An einai panw apo 30 xarakthres
+		while((ch = getchar()) != EOF && ch != '\n'){
+			continue;
+		}
+	}
+	while((ch = getchar()) != EOF && ch != '\n')
+	{
+		if (ch=='\n'){							//Ka8arisma endexomenwn ypoleipomenwn newline
+			scanf("%c", &ch);
+		}
+		else
+			continue;
+	}
+}
+
+/*
+==================================================================
+Thema 3: HELP INFO
+==================================================================
+*/
+
+void help()
+{
+	printf("*** Valid move is: <Letter of Pawn> followed by <x dim> followed by <y dim>.\nGiven example:Ka1.\n");
+	printf("K=king, Q=queen, R=rook, B=bishop, N=knight, P=pawn\n(P can be also be implied with no pawn definition).\n");
+	printf("You can see valid board positions by exiting this and selecting 'd'.***\n");
+}
+
+/*----------------------------------------------------------------------------------------*/
+
+
+
+
+
