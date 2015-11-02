@@ -1,0 +1,297 @@
+/*
+ *   ===Text2Phon===
+ *     Created on: Dec 18, 2011
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+//DOMH gia kyklikh lista
+struct p_item{
+	char p_letter;
+	char p_word[15];
+	struct p_item *p_next;
+};
+
+typedef struct p_item CirList;							//orismos domhs
+CirList *tailNode;										//neos komvos ws proswrina teleytaios sth lista
+
+//ARCHETYPA SYNARTHSEWN
+struct p_item *LoadPhonetics (char *filename);
+struct p_item *createList(char array[]);				//dhmiourgia listas
+char *getWordfromline(char array[],char word[]);		//na parw th lexh pou antistoixei se ka8e gramma
+void freeList(CirList *tail);							//eleytherwsh xwrou listas
+int *checkConflicts(CirList *tail);						//elegxos gia pi8ana conflicts
+struct p_item *LetterToPhonetic(char character, CirList *current);
+
+/*
+==========================================================================================================================
+                                    				MAIN PROGRAM
+==========================================================================================================================
+*/
+
+int main(int argc, char *argv[])
+{
+	char ch;
+	char *myfilename;
+	FILE *pFile;		//gia to arxeio input
+	FILE *p2File;		//gia to arxeio output
+	tailNode=NULL;		//arxikopoihsh kyklikhs listas, adeia lista
+	CirList *new;		//to xrhsimopoiw gia aplh antistoixia apo th function
+
+	printf("======================================================================\n");
+	printf("                 	      Text2Phon 								  \n");
+	printf("======================================================================\n");
+
+	//elegxos gia ta arguments
+	if (argc!=4){
+		printf("#Number of arguments are not the required to execute the program.\n");
+		printf("#Pls enter: Text2Phon <alphabet_name> <source_file> <output_file>.\n");
+		printf("#Given example: Text2Phon ICAO input.txt output.txt\n\n");
+		exit(1);
+	}
+	else if (argc==4){
+		if (!strcmp(argv[1],"ICAO")){
+			myfilename="ICAO.phon";
+			printf("Your file to open is ICAO.phon.\n");
+		}
+		else if (!strcmp(argv[1],"LAPD")){
+			myfilename="LAPD.phon";
+			printf("Your file to open is LAPD.phon.\n");
+		}
+		else{
+			printf("No such file for alphabet exists.\n");
+			printf("For alphabet name pls choose between ICAO or LPAD.(case sensitive).\n");
+			printf("#Pls enter again correctly: Text2Phon <alphabet_name> <source_file> <output_file>.\n");
+			exit(1);
+		}
+
+		LoadPhonetics(myfilename);  //fortwnw ta fwnhtika apo ta arxeia ICAO kai LAPD
+
+		//anoigma arxeiou gia to diavasma tou arxeiou input.txt pou thelw gia antistoixia
+		pFile=fopen(argv[2],"r");
+		if (pFile==NULL){			//elegxos gia anoigma arxeiou
+			printf("\nCant open given file %s to read characters from.\n",argv[2]);
+			printf("Try again with an existing file.\n");
+			exit(1);
+		}
+		else{
+			printf("=== File %s opened successfully ===\n",argv[2]);
+			printf("=== We can start reading our characters ===\n");
+		}
+
+		//sth synexeia
+		//anoigma arxeiou gia grapsimo output.txt
+		p2File=fopen(argv[3],"w");
+		if (p2File==NULL){			//elegxos gia anoigma arxeiou
+			printf("\nCant open given file %s to read characters from.\n",argv[3]);
+			printf("Try again with an existing file.\n");
+			exit(1);
+		}
+		else{
+			printf("=== File %s opened successfully ===\n",argv[3]);
+			printf("=== We can start writing in file ===\n");
+		}
+		while (ch!=EOF){
+			ch = fgetc(pFile); 		//diavasma xarakthrwn sto arxeio input
+			ch=toupper(ch);			//metatroph se kefalaia gia th sygkrish
+			new=LetterToPhonetic(ch,tailNode);	//antistoixish me ta fwnhtika
+			if (ch==new->p_letter){
+				fprintf(p2File,"%s ",new->p_word);
+			}
+			else if (ch!=new->p_letter){
+				if (ch==' ' || ch==EOF)
+					fprintf(p2File,"\n");
+				else if (ch=='\n')
+					fprintf(p2File,"\n""\n");
+				else
+					fprintf(p2File,"%c",ch);
+			}
+		}
+		printf("=== Open the file you wanted to write to, to see your results: '%s' ===\n",argv[3]);
+		fclose(pFile);
+		fclose(p2File);
+	}
+	return 0;
+}
+
+/*
+__________________________________________________________________________________________________________________________
+
+                                      	  	  ===ORISMOS SYNARTHSEWN===
+__________________________________________________________________________________________________________________________
+*/
+/*
+==========================================================================================================================
+                          	  	    Thema 1-2: FORTWNW TA DEDOMENA APO TA ICAO KAI LAPD
+==========================================================================================================================
+*/
+struct p_item *LoadPhonetics(char *filename)
+{
+	int count=0;			//ari8mos grammwn
+	char line[50]; 			//megethos string
+	FILE *ptrToFile;
+
+	//anoigma arxeiou gia diavasma
+	ptrToFile=fopen(filename,"r");
+	if (ptrToFile==NULL){	//elegxos gia anoigma arxeiou
+		printf("Cant open given file\n");
+		exit(1);
+		return NULL;
+	}
+	else
+		printf("=== File %s opened successfully ===\n",filename);
+
+	//gemisma listas
+	while(fgets(line,sizeof line,ptrToFile)!= NULL){ //diavasma grammhs
+		count ++;
+		createList(line);			//dhmiourgia kyklikhs listas
+		checkConflicts(tailNode); 	//elegxos an yparxei hdh to stoixeio
+		}
+	printf("No element conflicts.\n");
+
+	//elegxos arithmwn grammwn
+	if (count!=38){
+		printf("Lathos arithmos grammwn = %d . We need 38 lines.\n",count);
+		freeList(tailNode); 		//ean exw lathos arithmo grammwn katharisma hdh desmeymenou xwrou
+		exit(1);
+		return NULL;
+	}
+	printf("File has correctly %d lines.\n",count);
+	printf("Circular Linked List is ready.\n");
+	fclose (ptrToFile);
+	return tailNode;
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  Thema 1-2: DHMIOURGIA KYKLIKHS LISTAS
+==========================================================================================================================
+*/
+
+struct p_item *createList(char array[])
+{
+	int i;
+	char word[15];
+	CirList *LastInsNode;
+	LastInsNode = (CirList*)malloc(sizeof(CirList));
+	if (LastInsNode==NULL)
+		exit (1);
+	LastInsNode->p_letter = array[0];
+	printf("%c ",LastInsNode->p_letter);
+	//na ksexwrisw th lexh sto string
+	getWordfromline(array,word);
+
+	//kai th metaferw sto word array
+	for (i=0;i<15;i++){
+		LastInsNode->p_word[i]=word[i];
+	}
+	printf("%s\n",LastInsNode->p_word);
+
+	//gia to pou tha topotheththei
+	if(tailNode == NULL){						//ean h lista einai adeia
+		tailNode = LastInsNode;					//pairnei tis times tou LastNode
+		LastInsNode->p_next=tailNode;			//kai o deikths tou LastNode deixnei sto FirstNode=tailnode dhladh ston eayto tou
+		}
+	else{										//h lista den einai adeia opote prosthetw ton komvo sto telos
+		LastInsNode->p_next = tailNode->p_next; //o neos komvos deixnei sto epomeno tou FirstNode
+		tailNode->p_next=LastInsNode;
+		tailNode=LastInsNode;
+	}
+	return tailNode;
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	 Thema 1-2: Eyresh antistoixhs lexhs
+==========================================================================================================================
+*/
+
+char *getWordfromline(char array[], char word[15])
+{
+	int i;
+	i=2;
+	//xekinw apo th thesh 2 efoson xerw oti h 8esh 0 exei to gramma kai h 8esh 2 exei whitespace
+	for (i=2;i<15;i++){
+		if(array[i]=='\0' || array[i]=='\n'|| array[i]=='\r'|| array[i]==' ')
+			word[i-2]='\0';
+		else
+			word[i-2]=array[i];
+	}
+	return word;
+}
+
+/*
+==========================================================================================================================
+                          	  	  	  	  	  Thema 1-2: Free list
+==========================================================================================================================
+*/
+
+void freeList(CirList *tail)
+{
+	CirList *current;
+
+	//elegxos an h lista einai adeia
+	if (tailNode!=NULL){
+		current=tailNode->p_next;
+		while (current!=tailNode){
+			free(current);
+			current=current->p_next;
+		}
+		current=tailNode;
+		free(current);
+	}
+}
+
+/*
+==========================================================================================================================
+                          	  	  Thema 1-2: Elegxos gia hdh yparxon stoixeio sth lista
+==========================================================================================================================
+*/
+
+int *checkConflicts(CirList *tail)
+{
+	CirList *current;
+
+	//elegxos an h lista einai adeia
+	if (tailNode!=NULL){						//ean den einai adeia
+		current=tailNode->p_next;				//to diatrexon 8a einai to epomeno apo apo ayto pou eimai twra
+		while (current!=tailNode){
+			if(current->p_letter==tailNode->p_letter ||current->p_word==tailNode->p_word){
+				if (current->p_letter==tailNode->p_letter)
+					printf("***%c character already exists.False situation!!!Exiting.***",tailNode->p_letter);
+				else
+					printf("***%s already exists.False situation!!!Exiting.***",tailNode->p_word);
+				freeList(tailNode);				//ean vrei conflict katharisma desmeymenou xwrou
+				exit(1);
+				return NULL;
+			}
+			current=current->p_next;
+		}
+		current=tailNode;
+	}
+	return 0;
+}
+
+/*
+==========================================================================================================================
+                          				Thema 2: Antistoixhsh Grammatwn me fwnhtika antistoixa
+==========================================================================================================================
+*/
+struct p_item *LetterToPhonetic(char character, CirList *current)
+{
+	CirList *start;								//8etw ws neo to start
+	start = current;
+	//diatrexw th lista kai kanw sygkrish
+	do {
+		if (character==current->p_letter){
+//			printf("***The character '%c' found in list.***\n",character);
+//			printf("***It's Phonetic is '%s'***\n",current->p_word);
+			return current;
+		}
+		current = current->p_next;
+	}while(current != start);					//synexizw th sygkrish ews na ftasw pali sthn arxh
+	return current;
+}
