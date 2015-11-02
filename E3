@@ -1,0 +1,713 @@
+/*
+ *  Created on: Nov 20, 2011
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define ROWS 8						//arithmos grammwm
+#define COLUMNS 8					//arithmos sthlwn
+#define MOVESIZE 50					//Mege8os pinaka
+
+int x,y;
+char **game;
+int i;
+char moveWB[MOVESIZE]="\0";			//Arxikopoihsh pinaka kinhsewn
+char pawns[]={'r', 'b', 'n','k', 'q', 'p','P','R', 'B', 'N', 'K', 'Q','-'}; //pinakas pioniwn
+char *ptrpawns = pawns;  			//deikths ston pinaka pioniwn
+int countforgame;					//metrhths gia na valw swsta ta piece sto game
+
+//domh gia kataxwrhsh kathe kinhshs
+struct move{
+	char piece;
+	char prevPos[2];
+	char nextPos[2];
+	struct move *next;
+	struct move *prev;
+};
+
+//"DList_Moves" to 1o node tis listas pou tha apoteleitai apo nodes typou struct "move"
+//Etsi mporoume na anaferomaste stin dipla sindedemeni lista san "DList_Moves"
+struct move *DList_Moves;
+
+//genikh domh gia stoiva
+struct stack_Node{
+	char data;
+	char isEatenBy;
+	struct stack_Node *next;
+};
+typedef struct stack_Node stack_Node;	//orismos domhs
+stack_Node *Swhite;						//stack white typou stack_Node
+stack_Node *Sblack;						//stack black typou stack_Node
+
+//Archetypa synarthsewn
+void menu();
+void gameAlloc();
+void FillTable(char **);
+void movement();
+void NewMoveAlloc(char prevPosChar);
+int mapLetterToInt(char);
+int mapIntToInt(int);
+int mapPawnToPoints(char Pawn_To_Points);
+struct move *getLastNode(struct move *);
+struct move *getLastNodeWithSamePiece(char ,struct move *);
+void push(stack_Node **Stack_Head_Node,char pieceToInsert);
+char pop(stack_Node **Stack_Head_Node);
+void score();
+void undoMoves(struct move **head,int NumOfNodes);
+
+/*
+==================================================================
+MAIN PROGRAM
+==================================================================
+*/
+
+int main()
+{
+	char c,ctemp;
+	int undo;
+	do {
+		//Emfanish main menu
+		menu();
+		do {
+			scanf("%c", &c);
+			if (c=='\n'){		//Sthn periptwsh epanalhpshs elegxw an exei krathsei kapoio newline
+				scanf("%c", &c);
+			}
+			while ((ctemp=getchar())!='\n');
+		}while (c!='N' && c!='S' && c!='U' && c!='E');
+
+		//Epiloges xrhsth
+		switch (c){
+		case 'N':
+			gameAlloc();		//dhmiourgia pinaka ME DESMEYSH MNHMHS
+			FillTable(game);	//gemisma pinaka game me tis arxikes theseis twn pioniwn
+			printf("***Setting up Chessboard***\n");
+			for ( x = 0; x < ROWS; x++ ){
+				for ( y = 0; y < COLUMNS; y++)
+					printf("%c",game[x][y]);
+				printf("\n");
+			}
+			DList_Moves=NULL;	//arxikopoihsh dipla dyndedemenhs
+			Swhite = NULL;		//arxikopoihsh stoivas white
+			Sblack = NULL;		//arxikopoihsh stoivas white
+
+			//xekinaei o xrhsths na dinei kinhseis.
+			printf("White play first!\n");
+			printf("Pls give white move:\n");
+
+			movement();			//elegxos kinhsewn, efarmogh kinhsewn se domes
+			break;
+		case 'S':
+			score(); 			//Eyresh Score kai nikhth paixnidiou
+			break;
+		case 'U':
+			undo=0;
+			printf("Please enter number of undo moves:\n");
+			do{
+				scanf("%d",&undo);
+			}while (undo <=0);
+			undoMoves(&DList_Moves,undo);//undo moves sth lista
+			break;
+		default:
+			//katharisma
+			for ( i = 0; i < COLUMNS; i++ ){
+				free(game[i]);
+			}
+			free(game);
+			free(DList_Moves);
+			free(Swhite);
+			free(Sblack);
+			c='E';
+			break;
+		}
+	}while (c!='E');
+	printf("***Program end***\n");
+	return 0;
+}
+
+/*----------------------------------------------------------------------------------------*/
+//ORISMOS SYNARTHSEWN
+
+/*
+==================================================================
+Thema 1: EMFANISH MENU
+==================================================================
+*/
+
+void menu()
+
+{
+	printf("\t==MAIN MENU==\n");
+	printf("[N] Start New Game\n");
+	printf("[S] Score \n");
+	printf("[U] Undo\n");
+	printf("[E] End Program\n");
+	printf("Selection (N, S, U, E):\n");
+}
+
+/*
+==================================================================
+Thema 1: gemisma pinaka game me arxikes theseis
+==================================================================
+*/
+
+void FillTable(char **array)
+{
+	for ( x = 0; x < ROWS; x++ ){
+		for ( y = 0; y < COLUMNS; y++){
+			if (x==0){
+				if (y==0 || y==7){
+					array[x][y]=*(ptrpawns+7);	//'P'
+					}
+				else if (y==1 || y==6){
+					array[x][y]=*(ptrpawns+8);	//'B'
+					}
+				else if (y==2 || y==5){
+					array[x][y]=*(ptrpawns+9);	//'N'
+					}
+				else if (y==3){
+					array[x][y]=*(ptrpawns+10);	//'K'
+					}
+				else if (y==4){
+					array[x][y]=*(ptrpawns+11);	//'Q'
+					}
+			}
+			else if (x==7){
+				if (y==0 || y==7){
+					array[x][y]=*ptrpawns;		//'r'
+					}
+				else if (y==1 || y==6){
+					array[x][y]=*(ptrpawns+1);	//'b'
+					}
+				else if (y==2 || y==5){
+					array[x][y]=*(ptrpawns+2);	//'n'
+					}
+				else if (y==3){
+					array[x][y]=*(ptrpawns+3);	//'k'
+					}
+				else if (y==4){
+					array[x][y]=*(ptrpawns+4);	//'q'
+					}
+			}
+			else if (x==1){
+				array[x][y]=*(ptrpawns+6);		//'p'
+				}
+			else if (x==6){
+				array[x][y]=*(ptrpawns+5);		//'-'
+				}
+			else{
+				array[x][y]=*(ptrpawns+12);		//'P'
+				}
+		}
+	}
+}
+
+/*
+==================================================================
+Thema 2: Antistoixish syntetagmenwn: grammata me arithmous tou game
+==================================================================
+*/
+
+int mapLetterToInt(char Mapletter_To_Y_cord)
+{
+	switch(Mapletter_To_Y_cord){
+	case 'a':return 0;
+	case 'b':return 1;
+	case 'c':return 2;
+	case 'd':return 3;
+	case 'e':return 4;
+	case 'f':return 5;
+	case 'g':return 6;
+	case 'h':return 7;
+	}
+return 0;
+}
+
+/*
+==================================================================
+Thema 2: Antistoixish syntetagmenwn: arithmoi me arithmous tou game
+==================================================================
+*/
+
+int mapIntToInt(int MapNumber_To_X_cord)
+{
+	switch(MapNumber_To_X_cord){
+	case '1':return 7;
+	case '2':return 6;
+	case '3':return 5;
+	case '4':return 4;
+	case '5':return 3;
+	case '6':return 2;
+	case '7':return 1;
+	case '8':return 0;
+	}
+return 0;
+}
+
+/*
+==================================================================
+Thema 3: Antistoixish pioniwn me pontous
+==================================================================
+*/
+
+int mapPawnToPoints(char Pawn_To_Points)
+{
+	switch(Pawn_To_Points){
+	case 'q':return 9;
+	case 'r':return 5;
+	case 'n':return 3;
+	case 'b':return 3;
+	case 'p':return 1;
+	case 'Q':return 9;
+	case 'R':return 5;
+	case 'N':return 3;
+	case 'B':return 3;
+	case 'P':return 1;
+	}
+return 0;
+}
+
+/*
+==================================================================
+Geniko: EYRESH PROHGOUMENOU NODE
+==================================================================
+*/
+
+struct move *getLastNode(struct move *HeadListNode)
+{
+	struct move *current =  malloc(sizeof(struct move));
+	current =  HeadListNode;			//current iso me to arxiko ths dipla syndedemenhs dhladh to DListMoves
+    while (current->next!= NULL){ 		//oso den einai iso me null
+    	current = current->next; 		//8a isoutai me to epomeno
+    }
+    return current; 					//telika tha kratisei kai 8a epistrepsei to teleytaio node me ->next=NULL
+}
+
+/*
+==================================================================
+Thema 2: EYRESH PROHGOUMENOU NODE ME TO IDIO PIECE
+==================================================================
+*/
+
+struct move *getLastNodeWithSamePiece(char PieceToFind,struct move *DList_Moves)
+{
+	struct move *current = DList_Moves; //to prwto node tis listas
+	struct move *NodeFound;				//to node pou tha vrw me idio piece
+	while (current != NULL){
+		if (current->piece == PieceToFind){
+			NodeFound = current;		//krataei to pio prosfato node pou mpike gia to piece kathe fora
+		}
+	current = current->next;
+	}
+return NodeFound; 						//telika 8a kratisei kai 8a epistrepsei to teleytaio node me idio piece
+}
+
+/*
+==================================================================
+Thema 1: Desmeysh mnhmhs gia pinaka 8x8
+==================================================================
+*/
+
+void gameAlloc()
+{
+	//desmeyw mnhmh gia array grammwn pou exw
+	game=malloc(ROWS*sizeof(char*));
+	if(game == NULL){
+		printf("out of memory\n");
+		exit(1);
+	}
+	//desmeyw mnhmh gia ka8e array element tou array grammwn =sthlh
+	for (i = 0 ; i < ROWS ; i++){
+		game[i] = malloc(COLUMNS*sizeof(char));
+	}
+	if(game == NULL){
+		printf("out of memory\n");
+		exit(1);
+	}
+}
+
+/*
+==================================================================
+Thema 2: Desmeysh mnhmhs gia ka8e neo Node ths domhs Move kai ths dipla syndedemenhs listas
+		 Kataxwrhsh kinhsewn stis domes
+==================================================================
+*/
+
+void NewMoveAlloc(char nextPosChar)
+{
+	struct move *Newmove=NULL; 				//to vazw NULL gia na xekinaei sigoura kainourio
+	Newmove = malloc(sizeof(struct move));	//neos komvos me desmeysh mnhmhs
+	if (Newmove == NULL){					//elegxos an desmeusi mnimis OK
+		printf("memory allocation error");
+		exit(1);
+	}
+
+	if (DList_Moves == NULL){ 				//Proti kinisi: h lista einai null
+		DList_Moves = malloc(sizeof(struct move));
+		DList_Moves->prev= NULL;
+		DList_Moves->next=NULL;
+		DList_Moves->piece=moveWB[0];
+		DList_Moves->nextPos[0]=moveWB[1];
+		DList_Moves->nextPos[1]=moveWB[2];
+	}
+	else { //kathe alli kinisi
+		//kataxwrhsh prwths kinhshs sth domh move
+		Newmove->prev=getLastNode(DList_Moves);
+		Newmove->prev->next= Newmove;       //to prohgoumemo tou Newmove tha xei epomeno to Newmove
+		Newmove->next=NULL;
+		if (countforgame==0){				//otan prokeitai gia to pioni pou kinhthike
+			Newmove->piece=moveWB[0];
+		}
+		else{								//otan prokeitai gia to pioni pou fago8ike
+			Newmove->piece=game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])];
+		}
+		if (nextPosChar == '-') {			//apo fagoma
+			Newmove->nextPos[0] = nextPosChar;
+			Newmove->nextPos[1]= nextPosChar;
+		}
+		else {//kathe alli kinisi
+			Newmove->nextPos[0]=moveWB[1];
+			Newmove->nextPos[1]=moveWB[2];
+		}
+
+		//psaxnw apo thn arxh ths dipla syndedemenhs gia kinhsh apo to idio pioni
+		getLastNodeWithSamePiece(Newmove->piece,DList_Moves);
+		if ((getLastNodeWithSamePiece(Newmove->piece,DList_Moves))!=NULL){
+			Newmove->prevPos[0]=(getLastNodeWithSamePiece(Newmove->piece,DList_Moves)->nextPos[0]);
+			Newmove->prevPos[1]=(getLastNodeWithSamePiece(Newmove->piece,DList_Moves)->nextPos[1]);
+		}
+		else {
+			Newmove->prevPos[0]='\0';
+			Newmove->prevPos[1]='\0';
+		}
+	}
+}
+
+/*
+==================================================================
+Thema 2: Ylopoihsh paixnidiou,elegxos kinhsewn,kataxwrhsh se domes
+==================================================================
+*/
+void movement()
+{
+	int done,color;
+	int movelen;				//Input xrhsth
+	done=0;						//Arxikh katastash = akyrh kinhsh
+	color=0;					//Arxikh katastash enallaghs sto xrwma pioniou
+
+	do{
+		do{
+			//Dinei o xrhsths kinhsh gia leyka/mayra
+			fgets(moveWB,MOVESIZE,stdin);
+			movelen = strlen(moveWB);
+			if (movelen<=15){		//Epilegw na elegxw thn kinhsh mexri 15 xarakthres.
+				if (moveWB[0]!='\0' && moveWB[0] !='\n'){ /*Gia na mhn mpainei sto loop
+															prin to input tou xrhsth*/
+					//Elegxos kinhsewn
+					//Me tria stoixeia (ean 8a vrei eidos pioniou)
+					if (color==0){
+						if (moveWB[0]=='k'||moveWB[0]=='q'||moveWB[0]=='r'||moveWB[0]=='n'||moveWB[0]=='b'||moveWB[0]=='p'){
+							if  (moveWB[1]>=97 && moveWB[1]<=104){
+								if (moveWB[2]>='1' && moveWB[2]<='8' && moveWB[3]=='\n'){
+									moveWB[3]='\0';
+									//xekinw me tis kinhseis
+									if ((game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='-')||
+										(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='Q')||
+										(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='R')||
+										(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='N')||
+										(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='B')||
+										(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='P')){
+										done=1;					//metrhths = egkyrh kinhsh
+										printf("White move is valid!!!\n");
+										countforgame=0;			//prokeitai gia to pioni pou kinhthike
+										//desmeysh mnhmhs gia neo komvo kai topothethsh sth lista kai sth stoiva
+										NewMoveAlloc('\0');
+										printf("White move is set in struct move and double linked list!!!\n");
+
+										if (game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]!='-'){
+
+											//kataxwrhsh pioniou sth stoiva white
+											countforgame=1;			//prokeitai gia to pioni pou fago8ike
+											push(&Swhite,game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]);
+											printf("Black piece eaten is set in white stack!!!\n");
+
+											//kataxwrhsh kombou tou pioniou pou efyge apo to paixnidi
+											NewMoveAlloc('-');
+											printf("Black piece eaten is set in struct move and double linked list!!!\n");
+										}
+										else{
+											printf("You didnt kill any piece\n");
+										}
+										//ektypwsh game me adeia th thesh tou pioniou pou kinhthike
+										for ( x = 0; x < ROWS; x++ )
+											for ( y = 0; y < COLUMNS; y++)
+												if (game[x][y]==moveWB[0])
+													game[x][y]='-';
+
+										//kanw antistoixish twn grammatwn ths x syntetagmenhs ths skakieras me tis syntetagmenes tou game
+										game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]= moveWB[0];
+
+										//print h skakiera
+										for ( x = 0; x < ROWS; x++ ){
+											for ( y = 0; y < COLUMNS; y++)
+												printf("%c",game[x][y]);
+											printf("\n");
+										}
+										//seira twn mayrwn
+										printf("Please give black move.\n");
+										done=0;
+										color=1;
+
+									}//an xtyphsei to basilia tou antipalou to paixnidi termatizei
+									else if ((game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='K')){
+										printf("***WHITE WIN!***\n");
+										break;
+
+									}//an xtyphsei diko tou pioni xanadinei kinhsh o idios paixths
+									else if((game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='q')||
+											(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='r')||
+											(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='n')||
+											(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='b')||
+											(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='k')||
+											(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='p')){
+										printf("Your movement is not correct. Suicide Is Forbidden!!!\n Kill white! Not Yourself!!!\n");
+										for ( x = 0; x < ROWS; x++ ){
+											for ( y = 0; y < COLUMNS; y++)
+												printf("%c",game[x][y]);
+											printf("\n");
+										}
+										printf("Please give white move again.\n");
+										done=0;
+										color=0;	//metrhths = pali to idio xrwma
+									}
+								}
+								else
+									printf("Please try again.\n");
+							}
+							else
+								printf("Please try again.\n");
+						}
+						else if (moveWB[0]=='#'){
+							break;
+						}else
+							printf("Please try again.\n");
+					}
+					else if (color==1){
+						if (moveWB[0]=='K'||moveWB[0]=='Q'||moveWB[0]=='R'||moveWB[0]=='N'||moveWB[0]=='B'||moveWB[0]=='P'){
+							if  (moveWB[1]>=97 && moveWB[1]<=104){
+								if (moveWB[2]>='1' && moveWB[2]<='8' && moveWB[3]=='\n'){
+									moveWB[3]='\0';
+
+									//xekinw me tis kinhseis
+									if ((game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='-')||
+										(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='q')||
+										(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='r')||
+										(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='n')||
+										(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='b')||
+										(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='p')){
+										done=1;//metrhths = egkyrh kinhsh
+										printf("Black move is valid!!!\n");
+										countforgame=0;			//prokeitai gia to pioni pou kinhthike
+
+										//desmeysh mnhmhs gia neo komvo kai topothethsh sth lista kai sth stoiva
+										NewMoveAlloc('\0');
+										printf("Black move is set in struct move and double linked list!!!\n");
+
+										if (game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]!='-'){
+											countforgame=1;			//prokeitai gia to pioni pou fagothike
+											//kataxwrhsh pioniou sth stoiva black
+											push(&Sblack,game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]);
+											printf("White piece eaten is set in black stack!!!\n");
+
+											//kataxwrhsh kombou tou pioniou pou efyge apo to paixnidi
+											NewMoveAlloc('-');
+											printf("White piece eaten is set in struct move and double linked list!!!\n");}
+										else{
+											printf("You didnt kill any piece\n");
+										}
+										//ektypwsh game me adeia th thesh tou pioniou pou kinhthike
+											for ( x = 0; x < ROWS; x++ )
+												for ( y = 0; y < COLUMNS; y++)
+													if (game[x][y]==moveWB[0])
+														game[x][y]='-';
+										//kanw antistoixish twn grammatwn ths x syntetagmenhs ths skakieras me tis syntetagmenes tou game
+										game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]= moveWB[0];
+
+										//print h skakiera
+										for ( x = 0; x < ROWS; x++ ){
+											for ( y = 0; y < COLUMNS; y++)
+												printf("%c",game[x][y]);
+											printf("\n");
+										}
+										printf("Please give white move.\n");
+										done=0;
+										color=0;
+
+									}//an xtyphsei to basilia tou antipalou to paixnidi termatizei
+									else if ((game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='k'))
+									{
+										printf("***BLACK WIN!***\n");
+										break;
+
+									}//an xtyphsei diko tou pioni xanadinei kinhsh o idios paixths
+									else if((game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='Q')||
+											(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='R')||
+											(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='N')||
+											(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='B')||
+											(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='K')||
+											(game[mapIntToInt(moveWB[2])][mapLetterToInt(moveWB[1])]=='P')){
+										printf("Your movement is not correct. Suicide Is Forbidden!!!\n Kill white! Not Yourself!!!\n");
+										for ( x = 0; x < ROWS; x++ ){
+											for ( y = 0; y < COLUMNS; y++)
+												printf("%c",game[x][y]);
+											printf("\n");
+										}
+										printf("Please give black move again.\n");
+										done=0;
+										color=1;	//metrhths = pali to idio xrwma
+									}
+								}
+								else
+									printf("Please try again.\n");
+							}
+							else
+								printf("Please try again.\n");
+						}
+						else if (moveWB[0]=='#'){
+							break;
+						}else
+							printf("Please try again.\n");
+					}
+				}
+			}
+			else									//Ean einai panw apo 15 oi xarakthres
+				printf("Too long input. Try again\n");
+		}while(done==0);
+	}while (moveWB[0]!='#');
+	printf("***Return to main menu***\n\n");
+}
+
+/*
+==================================================================
+Thema 2: Push sth stoiva
+==================================================================
+*/
+
+void push(stack_Node **Stack_Head_Node,char pieceToInsert)
+{
+    stack_Node *new_Node_ToPush = malloc(sizeof(stack_Node));	//dhmiourgia neou node pou 8a ginei push sth stoiva
+    new_Node_ToPush->data = pieceToInsert;
+    new_Node_ToPush->isEatenBy = moveWB[0];
+    new_Node_ToPush->next = *Stack_Head_Node; 					//deikths se neo an yparxei
+    *Stack_Head_Node = new_Node_ToPush;
+}
+
+/*
+==================================================================
+Thema 3: Pop apo th stoiva
+==================================================================
+*/
+
+char pop(stack_Node **Stack_Head_Node)
+{
+	char pieceToDelete;
+	stack_Node *top = malloc(sizeof(stack_Node));
+	if (*Stack_Head_Node == NULL) {		//h stoiva einai adeia
+		return '\0';
+	}
+	else{ /* pop a node */
+		top = *Stack_Head_Node;
+        pieceToDelete = top->data;
+        *Stack_Head_Node = top->next;	//Epanaka8orismos tou Head_Node
+        free(top);
+        return pieceToDelete;
+	}
+}
+
+/*
+==================================================================
+Thema 3: Eyresh score kai nikhth paixnidiou
+==================================================================
+*/
+
+void score(){
+
+	char whitepopedPiece;	//to leyko pioni pou tha afairethei apo th stoiva
+	char blackpopedPiece;	//to mayro pioni pou tha afairethei apo th stoiva
+	int whitesum,blacksum;	//synola kerdismenwn ba8mwn
+	int value;
+
+	whitesum=0;
+	blacksum=0;
+	whitepopedPiece=pop(&Swhite);	//arxikopoiw giati an oxi krataei to 0
+	blackpopedPiece=pop(&Sblack);	//arxikopoiw giati an oxi krataei to 0
+
+	while(whitepopedPiece !='\0'){
+		printf("Poped black piece is: %c. Earned points for this piese: %d\n", whitepopedPiece,mapPawnToPoints(whitepopedPiece));
+		value=mapPawnToPoints(whitepopedPiece); //antistoixish me bathmous
+		whitesum=whitesum+value;				//synolo bathmwn
+		whitepopedPiece = pop(&Swhite);			//efarmogh pop sth stoiva
+	}
+	printf("Total earn points from killing black pieces: %d\n", whitesum);
+
+	while(blackpopedPiece !='\0'){
+		printf("Poped white piece is: %c. Earned points for this piese: %d\n", blackpopedPiece,mapPawnToPoints(blackpopedPiece));
+		value=mapPawnToPoints(blackpopedPiece); //antistoixish me bathmous
+		blacksum=blacksum+value;				//synolo bathmwn
+		blackpopedPiece = pop(&Sblack);			//efarmogh pop sth stoiva
+	}
+	printf("Total earn points from killing white pieces: %d\n", blacksum);
+	if (whitesum>blacksum)
+		printf("***WHITE WIN***\n\n");
+	else if (whitesum<blacksum)
+		printf("***BLACK WIN***\n\n");
+	else
+		printf("***IT'S A DRAW! PLAY AGAIN TO GET A WINNER***\n\n");
+}
+
+/*
+==================================================================
+Thema 4: Undo moves
+==================================================================
+*/
+
+void undoMoves(struct move** head,int NumOfNodes)
+{
+//	char whiteremoved;
+//	char blackremoved;
+	struct move* NodeToRemove = NULL;
+	struct move* newLastNode = NULL;
+	int count;
+	if (*head != NULL) {							//ean h lista den einai adeia
+		for(count=0; count<NumOfNodes; count++){
+			if (count==0){ 							//prwth fora
+				NodeToRemove = getLastNode(*head);	//8a einai to head to teleytaio node
+				}
+			else{
+				NodeToRemove = newLastNode;			//alliws to new
+				}
+			if ( NodeToRemove != NULL && NodeToRemove->prev!=NULL){
+				newLastNode = NodeToRemove->prev;
+			}
+			else{
+				newLastNode=*head;
+				break;
+			}
+			printf("Removed Move is:%c%c%c\n",NodeToRemove->piece,NodeToRemove->nextPos[0],NodeToRemove->nextPos[1]);
+//den paizei ayto gia stack
+//			if (Swhite != NULL && NodeToRemove->piece==Swhite->isEatenBy){
+//				whiteremoved=pop(&Swhite);
+//				printf("Eaten piece removed from stack white is:%c\n",whiteremoved);
+//			}
+//			else if (Sblack != NULL && NodeToRemove->piece==Sblack->isEatenBy){
+//				blackremoved=pop(&Sblack);
+//				printf("Eaten piece removed from black stack is:%c\n",blackremoved);
+//			}
+			free(NodeToRemove);
+		}
+	}
+	else
+		printf("Empty list.No moves to undo\n");
+}
