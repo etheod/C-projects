@@ -1,0 +1,66 @@
+/*
+ *   ===FUNCTIONS===
+ *     Created on: JAN 30, 2012
+ */
+
+
+/*
+==========================================================================================================================
+                          	  	    				Thema 5.a
+==========================================================================================================================
+*/
+
+int Treeheight(struct BTnode *node)
+{
+	int lheight;  							//ypsos aristera
+	int rheight;							//ypsos dexia
+	if (node==NULL)
+		return 0;
+	lheight = Treeheight(node->left);		//anadromika vriskw to ypsos aristera
+	rheight = Treeheight(node->right);		//anadromika vriskw to ypsos dexia
+	if ( lheight > rheight)					//elegxos poio einai megalytero
+		return(lheight+1);
+	else
+		return(rheight+1);
+}
+
+/*
+==========================================================================================================================
+	                          	  	    			Thema 5.b
+==========================================================================================================================
+*/
+
+int findMaxSum(struct BTnode *node)
+{
+  int maxSum;					//to megisto a8roisma
+  if (node==NULL)
+	return 0;
+  else if (node->left==NULL && node->right==NULL)
+	return node->key;			//an left kai right einai null epestrepse thn timh tou node mono
+  else
+	maxSum = node->key + max(findMaxSum(node->left),findMaxSum(node->right));
+	return maxSum;				//alliws anadromika vres ta max athroismata
+}
+
+/*
+==========================================================================================================================
+	                          	  	    			Thema 5.c
+==========================================================================================================================
+*/
+
+int checkifBalanced(struct BTnode *node)
+{
+   int lheight;
+   int rheight;
+
+   if(node == NULL)
+	   return 1;
+   lheight = Treeheight(node->left);		//vres ta ypsh aristera kai dexia toy parent
+   rheight = Treeheight(node->right);
+   if( abs(lheight-rheight) <= 1 &&			//an h diafora twn left kai right ypswn einai mikroterh h ish me to 1
+	checkifBalanced(node->left) &&			//elegkse to idio gia to aristero komvo kai ton dexi komvo
+	checkifBalanced(node->right))
+	   return 1;							//An isxyoun kai ta tria tote to dentro einai balanced
+   else
+	   return 0;
+}
